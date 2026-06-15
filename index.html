@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,7 +10,7 @@
 body {
   margin: 0;
   font-family: Arial;
-  background: #0d1117;
+  background: #0b1220;
   color: white;
   text-align: center;
 }
@@ -20,22 +21,28 @@ header {
 }
 
 h1 { margin: 0; }
-h2 { margin: 5px; font-size: 16px; color: #9ca3af; }
+h2 { margin: 5px; font-size: 14px; color: #9ca3af; }
 
-button {
+#status {
   margin-top: 20px;
-  padding: 20px;
   font-size: 18px;
-  border: none;
-  border-radius: 15px;
-  background: #22c55e;
-  color: white;
+  color: #22c55e;
 }
 
 #output {
   margin-top: 30px;
-  font-size: 22px;
+  font-size: 26px;
   padding: 20px;
+}
+
+button {
+  margin-top: 20px;
+  padding: 15px 25px;
+  font-size: 18px;
+  border: none;
+  border-radius: 12px;
+  background: #22c55e;
+  color: white;
 }
 </style>
 
@@ -48,14 +55,19 @@ button {
 <h2>Tecnosoft Argentina</h2>
 </header>
 
-<button onclick="startListening()">🎤 Hablar</button>
+<button onclick="startContinuous()">🎤 Iniciar modo continuo</button>
 
-<div id="output">Esperando voz...</div>
+<div id="status">Esperando inicio...</div>
+<div id="output">---</div>
 
 <script>
 
-// iniciar micrófono
-function startListening() {
+let recognition;
+let isRunning = false;
+
+// iniciar modo continuo
+function startContinuous() {
+
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
@@ -63,35 +75,81 @@ function startListening() {
     return;
   }
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US"; // inglés por defecto
-  recognition.start();
+  recognition = new SpeechRecognition();
 
-  document.getElementById("output").innerText = "Escuchando...";
+  recognition.continuous = true;   // 🔴 clave modo continuo
+  recognition.interimResults = false;
 
-  recognition.onresult = async function(event) {
-    let text = event.results[0][0].transcript;
+  recognition.onstart = () => {
+    isRunning = true;
+    document.getElementById("status").innerText = "🎧 Escuchando continuamente...";
+  };
+
+  recognition.onresult = async (event) => {
+
+    let text = event.results[event.results.length - 1][0].transcript;
+
     document.getElementById("output").innerText = "Detectado: " + text;
 
-    let translated = await translateText(text);
-    document.getElementById("output").innerText =
-      "Traducción: " + translated;
+    let lang = detectLanguage(text);
+
+    let translated = await translateText(text, lang);
+
+    document.getElementById("output").innerText = "Traducción: " + translated;
 
     speak(translated);
   };
+
+  recognition.onerror = () => {
+    document.getElementById("status").innerText = "⚠️ Error, reiniciando...";
+    restart();
+  };
+
+  recognition.onend = () => {
+    if (isRunning) {
+      restart(); // 🔁 reinicio automático
+    }
+  };
+
+  recognition.start();
 }
 
-// traductor usando API pública
-async function translateText(text) {
-  let res = await fetch("https://api.mymemory.translated.net/get?q="
+// reinicio automático
+function restart() {
+  setTimeout(() => {
+    if (recognition && isRunning) recognition.start();
+  }, 500);
+}
+
+// detectar idioma simple
+function detectLanguage(text) {
+
+  const portugueseWords = ["você", "não", "está", "bom", "agora"];
+  const lower = text.toLowerCase();
+
+  for (let w of portugueseWords) {
+    if (lower.includes(w)) return "pt";
+  }
+
+  return "en";
+}
+
+// traducir
+async function translateText(text, lang) {
+
+  let target = "es";
+
+  let res = await fetch(
+    "https://api.mymemory.translated.net/get?q="
     + encodeURIComponent(text)
-    + "&langpair=en|es");
+    + "&langpair=" + lang + "|" + target
+  );
 
   let data = await res.json();
   return data.responseData.translatedText;
 }
 
-// voz en español
+// hablar
 function speak(text) {
   let msg = new SpeechSynthesisUtterance(text);
   msg.lang = "es-ES";
