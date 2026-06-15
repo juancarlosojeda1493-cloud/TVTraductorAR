@@ -4,156 +4,197 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TV Traductor AR</title>
+<title>TV Traductor AR Mundial 2026</title>
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial;
-  background: #0b1220;
-  color: white;
-  text-align: center;
+body{
+    margin:0;
+    background:#000;
+    color:#fff;
+    font-family:Arial,Helvetica,sans-serif;
+    text-align:center;
 }
 
-header {
-  padding: 20px;
-  background: #111827;
+header{
+    background:#111;
+    padding:15px;
 }
 
-h1 { margin: 0; }
-h2 { margin: 5px; font-size: 14px; color: #9ca3af; }
-
-#status {
-  margin-top: 20px;
-  font-size: 18px;
-  color: #22c55e;
+h1{
+    margin:0;
+    font-size:28px;
 }
 
-#output {
-  margin-top: 30px;
-  font-size: 26px;
-  padding: 20px;
+h2{
+    margin:5px 0 0 0;
+    color:#aaa;
+    font-size:16px;
 }
 
-button {
-  margin-top: 20px;
-  padding: 15px 25px;
-  font-size: 18px;
-  border: none;
-  border-radius: 12px;
-  background: #22c55e;
-  color: white;
+button{
+    margin:15px;
+    padding:15px 25px;
+    font-size:18px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+#startBtn{
+    background:#22c55e;
+    color:white;
+}
+
+#status{
+    color:#22c55e;
+    margin-bottom:10px;
+}
+
+#subtitle{
+    font-size:36px;
+    line-height:1.4;
+    padding:20px;
+    min-height:180px;
+}
+
+#history{
+    text-align:left;
+    padding:15px;
+    border-top:1px solid #333;
+    max-height:250px;
+    overflow:auto;
+}
+
+.item{
+    margin-bottom:10px;
+    color:#ddd;
 }
 </style>
-
 </head>
 
 <body>
 
 <header>
-<h1>TV Traductor AR</h1>
+<h1>TV Traductor AR Mundial 2026</h1>
 <h2>Tecnosoft Argentina</h2>
 </header>
 
-<button onclick="startContinuous()">🎤 Iniciar modo continuo</button>
+<button id="startBtn" onclick="startRecognition()">
+🎤 Iniciar Traducción
+</button>
 
 <div id="status">Esperando inicio...</div>
-<div id="output">---</div>
+
+<div id="subtitle">
+Los subtítulos aparecerán aquí...
+</div>
+
+<div id="history"></div>
 
 <script>
 
 let recognition;
-let isRunning = false;
+let running = false;
 
-// iniciar modo continuo
-function startContinuous() {
+async function translateText(text){
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    try{
 
-  if (!SpeechRecognition) {
-    alert("Tu navegador no soporta reconocimiento de voz");
-    return;
-  }
+        const response = await fetch(
+            "https://api.mymemory.translated.net/get?q=" +
+            encodeURIComponent(text) +
+            "&langpair=en|es"
+        );
 
-  recognition = new SpeechRecognition();
+        const data = await response.json();
 
-  recognition.continuous = true;   // 🔴 clave modo continuo
-  recognition.interimResults = false;
+        return data.responseData.translatedText;
 
-  recognition.onstart = () => {
-    isRunning = true;
-    document.getElementById("status").innerText = "🎧 Escuchando continuamente...";
-  };
+    }catch(error){
 
-  recognition.onresult = async (event) => {
-
-    let text = event.results[event.results.length - 1][0].transcript;
-
-    document.getElementById("output").innerText = "Detectado: " + text;
-
-    let lang = detectLanguage(text);
-
-    let translated = await translateText(text, lang);
-
-    document.getElementById("output").innerText = "Traducción: " + translated;
-
-    speak(translated);
-  };
-
-  recognition.onerror = () => {
-    document.getElementById("status").innerText = "⚠️ Error, reiniciando...";
-    restart();
-  };
-
-  recognition.onend = () => {
-    if (isRunning) {
-      restart(); // 🔁 reinicio automático
+        return text;
     }
-  };
-
-  recognition.start();
 }
 
-// reinicio automático
-function restart() {
-  setTimeout(() => {
-    if (recognition && isRunning) recognition.start();
-  }, 500);
+function addHistory(text){
+
+    const history = document.getElementById("history");
+
+    const item = document.createElement("div");
+
+    item.className = "item";
+
+    item.innerText = text;
+
+    history.prepend(item);
 }
 
-// detectar idioma simple
-function detectLanguage(text) {
+function startRecognition(){
 
-  const portugueseWords = ["você", "não", "está", "bom", "agora"];
-  const lower = text.toLowerCase();
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
 
-  for (let w of portugueseWords) {
-    if (lower.includes(w)) return "pt";
-  }
+    if(!SpeechRecognition){
 
-  return "en";
+        alert("Tu navegador no soporta reconocimiento de voz.");
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onstart = function(){
+
+        running = true;
+
+        document.getElementById("status").innerText =
+            "🎧 Escuchando entrevista...";
+    };
+
+    recognition.onresult = async function(event){
+
+        let original =
+            event.results[event.results.length - 1][0].transcript;
+
+        let translated =
+            await translateText(original);
+
+        document.getElementById("subtitle").innerText =
+            translated;
+
+        addHistory(translated);
+    };
+
+    recognition.onerror = function(){
+
+        restartRecognition();
+    };
+
+    recognition.onend = function(){
+
+        if(running){
+
+            restartRecognition();
+        }
+    };
+
+    recognition.start();
 }
 
-// traducir
-async function translateText(text, lang) {
+function restartRecognition(){
 
-  let target = "es";
+    setTimeout(() => {
 
-  let res = await fetch(
-    "https://api.mymemory.translated.net/get?q="
-    + encodeURIComponent(text)
-    + "&langpair=" + lang + "|" + target
-  );
+        try{
 
-  let data = await res.json();
-  return data.responseData.translatedText;
-}
+            recognition.start();
 
-// hablar
-function speak(text) {
-  let msg = new SpeechSynthesisUtterance(text);
-  msg.lang = "es-ES";
-  window.speechSynthesis.speak(msg);
+        }catch(e){}
+    },500);
 }
 
 </script>
