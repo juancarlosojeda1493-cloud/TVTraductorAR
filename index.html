@@ -1,14 +1,104 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TV Traductor AR</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0d1117;
+  color: white;
+  text-align: center;
+}
+
+header {
+  padding: 20px;
+  background: #111827;
+}
+
+h1 { margin: 0; }
+h2 { margin: 5px; font-size: 16px; color: #9ca3af; }
+
+button {
+  margin-top: 20px;
+  padding: 20px;
+  font-size: 18px;
+  border: none;
+  border-radius: 15px;
+  background: #22c55e;
+  color: white;
+}
+
+#output {
+  margin-top: 30px;
+  font-size: 22px;
+  padding: 20px;
+}
+</style>
+
 </head>
+
 <body>
+
+<header>
 <h1>TV Traductor AR</h1>
 <h2>Tecnosoft Argentina</h2>
-<p>Sistema en línea funcionando ✔</p>
+</header>
+
+<button onclick="startListening()">🎤 Hablar</button>
+
+<div id="output">Esperando voz...</div>
+
+<script>
+
+// iniciar micrófono
+function startListening() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    alert("Tu navegador no soporta reconocimiento de voz");
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US"; // inglés por defecto
+  recognition.start();
+
+  document.getElementById("output").innerText = "Escuchando...";
+
+  recognition.onresult = async function(event) {
+    let text = event.results[0][0].transcript;
+    document.getElementById("output").innerText = "Detectado: " + text;
+
+    let translated = await translateText(text);
+    document.getElementById("output").innerText =
+      "Traducción: " + translated;
+
+    speak(translated);
+  };
+}
+
+// traductor usando API pública
+async function translateText(text) {
+  let res = await fetch("https://api.mymemory.translated.net/get?q="
+    + encodeURIComponent(text)
+    + "&langpair=en|es");
+
+  let data = await res.json();
+  return data.responseData.translatedText;
+}
+
+// voz en español
+function speak(text) {
+  let msg = new SpeechSynthesisUtterance(text);
+  msg.lang = "es-ES";
+  window.speechSynthesis.speak(msg);
+}
+
+</script>
+
 </body>
 </html>
