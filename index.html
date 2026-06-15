@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TV Traductor AR Mundial 2026</title>
+<title>TV Traductor AR PRO Mundial 2026</title>
 
 <style>
 body{
@@ -17,24 +17,25 @@ body{
 
 header{
     background:#111;
-    padding:15px;
+    padding:12px;
 }
 
 h1{
     margin:0;
-    font-size:28px;
+    font-size:24px;
 }
 
 h2{
-    margin:5px 0 0 0;
+    margin:4px;
     color:#aaa;
-    font-size:16px;
+    font-size:13px;
 }
 
+/* BOTONES */
 button{
-    margin:15px;
-    padding:15px 25px;
-    font-size:18px;
+    margin:6px;
+    padding:12px 16px;
+    font-size:15px;
     border:none;
     border-radius:10px;
     cursor:pointer;
@@ -45,48 +46,66 @@ button{
     color:white;
 }
 
-#status{
-    color:#22c55e;
-    margin-bottom:10px;
-}
-
+/* SUBTÍTULO (50% reducido) */
 #subtitle{
-    font-size:36px;
+    font-size:12px;
     line-height:1.4;
-    padding:20px;
-    min-height:180px;
+    padding:18px;
+    min-height:120px;
+    color:#fff;
 }
 
-#history{
-    text-align:left;
+/* CAJA INFERIOR */
+#translatedBox{
+    margin-top:10px;
     padding:15px;
     border-top:1px solid #333;
-    max-height:250px;
-    overflow:auto;
+    font-size:16px;
+    min-height:60px;
+    color:#f1f1f1;
 }
 
-.item{
-    margin-bottom:10px;
-    color:#ddd;
+/* STATUS */
+#status{
+    color:#22c55e;
+    margin-top:5px;
+    font-size:13px;
 }
+
+/* HISTORIAL */
+#history{
+    text-align:left;
+    padding:10px;
+    border-top:1px solid #333;
+    max-height:120px;
+    overflow:auto;
+    font-size:12px;
+    color:#ccc;
+}
+
+.item{margin-bottom:5px;}
 </style>
 </head>
 
 <body>
 
 <header>
-<h1>TV Traductor AR Mundial 2026</h1>
-<h2>Tecnosoft Argentina</h2>
+<h1>TV Traductor AR</h1>
+<h2>Mundial 2026 - Tecnosoft Argentina</h2>
 </header>
 
-<button id="startBtn" onclick="startRecognition()">
-🎤 Iniciar Traducción
-</button>
+<button id="startBtn" onclick="toggleRecognition()">🎤 Iniciar / Detener</button>
 
-<div id="status">Esperando inicio...</div>
+<div id="status">Listo para entrevistas</div>
 
-<div id="subtitle">
-Los subtítulos aparecerán aquí...
+<div id="subtitle">Esperando audio...</div>
+
+<div id="translatedBox"></div>
+
+<div>
+<button onclick="copyTrans()">📋 Copiar</button>
+<button onclick="clearTrans()">🗑 Borrar</button>
+<button onclick="continuar()">▶ Continuar</button>
 </div>
 
 <div id="history"></div>
@@ -96,105 +115,153 @@ Los subtítulos aparecerán aquí...
 let recognition;
 let running = false;
 
-async function translateText(text){
-
-    try{
-
-        const response = await fetch(
-            "https://api.mymemory.translated.net/get?q=" +
-            encodeURIComponent(text) +
-            "&langpair=en|es"
-        );
-
-        const data = await response.json();
-
-        return data.responseData.translatedText;
-
-    }catch(error){
-
-        return text;
+// ON / OFF
+function toggleRecognition(){
+    if(running){
+        stopRecognition();
+    }else{
+        startRecognition();
     }
 }
 
-function addHistory(text){
-
-    const history = document.getElementById("history");
-
-    const item = document.createElement("div");
-
-    item.className = "item";
-
-    item.innerText = text;
-
-    history.prepend(item);
-}
-
+// iniciar
 function startRecognition(){
 
-    const SpeechRecognition =
-        window.SpeechRecognition ||
-        window.webkitSpeechRecognition;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if(!SpeechRecognition){
-
-        alert("Tu navegador no soporta reconocimiento de voz.");
-        return;
-    }
-
-    recognition = new SpeechRecognition();
+    recognition = new SR();
 
     recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang = "en-US";
 
-    recognition.onstart = function(){
-
+    recognition.onstart = () => {
         running = true;
-
-        document.getElementById("status").innerText =
-            "🎧 Escuchando entrevista...";
+        document.getElementById("status").innerText = "🎧 Escuchando en vivo...";
+        document.getElementById("startBtn").innerText = "⏹ Detener";
     };
 
-    recognition.onresult = async function(event){
+    recognition.onresult = async (e) => {
 
-        let original =
-            event.results[event.results.length - 1][0].transcript;
+        let text = e.results[e.results.length - 1][0].transcript;
 
-        let translated =
-            await translateText(original);
+        let lang = detectLang(text);
 
-        document.getElementById("subtitle").innerText =
-            translated;
+        let translated = await translate(text, lang);
+
+        document.getElementById("subtitle").innerText = translated;
+        document.getElementById("translatedBox").innerText = translated;
 
         addHistory(translated);
     };
 
-    recognition.onerror = function(){
+    recognition.onerror = () => restart();
 
-        restartRecognition();
-    };
-
-    recognition.onend = function(){
-
-        if(running){
-
-            restartRecognition();
-        }
+    recognition.onend = () => {
+        if(running) restart();
     };
 
     recognition.start();
 }
 
-function restartRecognition(){
+// detener
+function stopRecognition(){
+    running = false;
 
+    document.getElementById("status").innerText = "⏸ Detenido";
+    document.getElementById("startBtn").innerText = "🎤 Iniciar";
+
+    try{
+        recognition.stop();
+    }catch(e){}
+}
+
+// reinicio automático
+function restart(){
     setTimeout(() => {
+        if(running){
+            try{ recognition.start(); }catch(e){}
+        }
+    },400);
+}
 
-        try{
+// detección idioma simple
+function detectLang(text){
 
+    text = text.toLowerCase();
+
+    const pt = ["você","não","está","agora","muito"];
+
+    for(let w of pt){
+        if(text.includes(w)) return "pt";
+    }
+
+    return "en";
+}
+
+// traducción
+async function translate(text, lang){
+
+    if(lang === "es") return text;
+
+    try{
+
+        let res = await fetch(
+            "https://api.mymemory.translated.net/get?q="
+            + encodeURIComponent(text)
+            + "&langpair=" + lang + "|es"
+        );
+
+        let data = await res.json();
+
+        return data.responseData.translatedText;
+
+    }catch(e){
+        return text;
+    }
+}
+
+// copiar
+function copyTrans(){
+
+    navigator.clipboard.writeText(
+        document.getElementById("translatedBox").innerText
+    );
+
+    alert("Copiado");
+}
+
+// borrar
+function clearTrans(){
+
+    document.getElementById("subtitle").innerText = "Esperando audio...";
+    document.getElementById("translatedBox").innerText = "";
+    document.getElementById("history").innerHTML = "";
+}
+
+// continuar
+function continuar(){
+
+    try{
+        if(recognition){
             recognition.start();
+        }
+    }catch(e){}
+}
 
-        }catch(e){}
-    },500);
+// historial
+function addHistory(text){
+
+    let div = document.createElement("div");
+    div.className = "item";
+    div.innerText = text;
+
+    let history = document.getElementById("history");
+
+    history.prepend(div);
+
+    if(history.children.length > 10){
+        history.removeChild(history.lastChild);
+    }
 }
 
 </script>
